@@ -54,7 +54,7 @@ impl FallibleError for eyre::Report {
 
 impl FallibleError for () {
     fn simulated_failure() -> Self {
-        ()
+        
     }
 }
 
@@ -188,7 +188,7 @@ impl FailureConfig {
 
         if self.trigger_every > 0 {
             let count = self.counter.fetch_add(1, Ordering::Relaxed);
-            return count % self.trigger_every == 0;
+            return count.is_multiple_of(self.trigger_every);
         }
 
         if self.probability > 0 {
