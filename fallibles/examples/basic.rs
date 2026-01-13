@@ -144,5 +144,74 @@ fn main() {
         }
     }
 
+    println!("\n9. latency injection (10-50ms delay per check):");
+    {
+        use std::time::{Duration, Instant};
+
+        let _guard = fallibles_core::with_config(
+            fallibles_core::FailureConfig::new()
+                .with_probability(0.3)
+                .with_latency(Duration::from_millis(10), Duration::from_millis(50)),
+        );
+
+        let start = Instant::now();
+        for i in 0..5 {
+            match read_config() {
+                Ok(_) => print!("."),
+                Err(_) => print!("X"),
+            }
+        }
+        let elapsed = start.elapsed();
+        println!(" (took {:.0}ms for 5 checks)", elapsed.as_millis());
+    }
+
+    println!("\n10. failure limits (max 3 failures):");
+    {
+        let config = fallibles_core::FailureConfig::new()
+            .with_probability(0.8)
+            .max_failures(3);
+        let _guard = fallibles_core::with_config(config);
+
+        for i in 0..15 {
+            match read_config() {
+                Ok(_) => print!("."),
+                Err(_) => print!("X"),
+            }
+        }
+        println!();
+
+        if let Some(stats) = fallibles_core::get_failure_stats() {
+            println!("   {} failures triggered (max was 3)", stats.total_failures);
+            if stats.limited_failures > 0 {
+                println!("   {} additional failures were blocked by limit", stats.limited_failures);
+            }
+        }
+    }
+
+    println!("\n11. combined: latency + limits + metrics:");
+    {
+        use std::time::Duration;
+
+        let config = fallibles_core::FailureConfig::new()
+            .with_probability(0.4)
+            .with_latency(Duration::from_millis(5), Duration::from_millis(15))
+            .max_failures(5)
+            .on_failure(|fp| {
+                println!("      [FAIL] {} at line {}", fp.function, fp.line);
+            });
+
+        let _guard = fallibles_core::with_config(config);
+
+        println!("   Running 20 checks:");
+        for _ in 0..20 {
+            let _ = read_config();
+        }
+
+        println!("\n   Statistics:");
+        if let Some(stats) = fallibles_core::get_failure_stats() {
+            stats.report();
+        }
+    }
+
     println!("\ncomplete!");
 }

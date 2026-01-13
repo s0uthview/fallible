@@ -8,6 +8,9 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
+#[cfg(feature = "std")]
+use std::time::Duration;
+
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
@@ -150,11 +153,82 @@ pub type FailurePredicate = Box<dyn Fn() -> bool + Send + Sync>;
 /// Statistics about failure behavior.
 ///
 /// Tracks how many times failure points were checked and how many failures were triggered.
+#[derive(Clone, Debug)]
 pub struct FailureStats {
     /// Total number of times failure points were evaluated
     pub total_checks: u64,
     /// Total number of failures that were actually triggered
     pub total_failures: u64,
+    /// Number of checks that would have failed but were blocked by limits
+    pub limited_failures: u64,
+    /// Total latency injected in nanoseconds
+    #[cfg(feature = "std")]
+    pub total_latency_ns: u64,
+}
+
+impl FailureStats {
+    /// Get the failure rate as a percentage (0.0 to 100.0).
+    pub fn failure_rate(&self) -> f64 {
+        if self.total_checks == 0 {
+            0.0
+        } else {
+            (self.total_failures as f64 / self.total_checks as f64) * 100.0
+        }
+    }
+
+    /// Get the success rate as a percentage (0.0 to 100.0).
+    pub fn success_rate(&self) -> f64 {
+        100.0 - self.failure_rate()
+    }
+
+    /// Print statistics report to stdout.
+    ///
+    /// Uses ANSI colors: green for successes, red for failures, yellow for limited.
+    #[cfg(feature = "std")]
+    pub fn report(&self) {
+        use std::println;
+
+        const RESET: &str = "\x1b[0m";
+        const GREEN: &str = "\x1b[32m";
+        const RED: &str = "\x1b[31m";
+        const YELLOW: &str = "\x1b[33m";
+        const CYAN: &str = "\x1b[36m";
+        const BOLD: &str = "\x1b[1m";
+
+        println!("{}{}failure injection statistics:{}", BOLD, CYAN, RESET);
+        println!("  total checks:     {}{}{}", CYAN, self.total_checks, RESET);
+        println!(
+            "  failures:         {}{}{} ({:.1}%)",
+            RED, self.total_failures, RESET, self.failure_rate()
+        );
+        println!(
+            "  successes:        {}{}{} ({:.1}%)",
+            GREEN,
+            self.total_checks.saturating_sub(self.total_failures),
+            RESET,
+            self.success_rate()
+        );
+        if self.limited_failures > 0 {
+            println!(
+                "  limited:          {}{}{} (blocked by max_failures)",
+                YELLOW, self.limited_failures, RESET
+            );
+        }
+        if self.total_latency_ns > 0 {
+            let latency_ms = self.total_latency_ns as f64 / 1_000_000.0;
+            println!(
+                "  total latency:    {}{:.2}ms{}",
+                CYAN, latency_ms, RESET
+            );
+            if self.total_checks > 0 {
+                let avg_latency_us = self.total_latency_ns as f64 / self.total_checks as f64 / 1000.0;
+                println!(
+                    "  avg per check:    {}{:.2}µs{}",
+                    CYAN, avg_latency_us, RESET
+                );
+            }
+        }
+    }
 }
 
 /// Configuration for failure injection behavior.
@@ -188,6 +262,14 @@ pub struct FailureConfig {
     failures_triggered: AtomicU64,
     seed: u64,
     predicate: Option<FailurePredicate>,
+    #[cfg(feature = "std")]
+    latency_min_ns: u64,
+    #[cfg(feature = "std")]
+    latency_max_ns: u64,
+    max_failures: u64,
+    limited_failures: AtomicU64,
+    #[cfg(feature = "std")]
+    total_latency_ns: AtomicU64,
 }
 
 impl FailureConfig {
@@ -205,6 +287,14 @@ impl FailureConfig {
             failures_triggered: AtomicU64::new(0),
             seed: 0,
             predicate: None,
+            #[cfg(feature = "std")]
+            latency_min_ns: 0,
+            #[cfg(feature = "std")]
+            latency_max_ns: 0,
+            max_failures: 0,
+            limited_failures: AtomicU64::new(0),
+            #[cfg(feature = "std")]
+            total_latency_ns: AtomicU64::new(0),
         }
     }
 
@@ -260,6 +350,14 @@ impl FailureConfig {
             failures_triggered: AtomicU64::new(0),
             seed: 0,
             predicate: None,
+            #[cfg(feature = "std")]
+            latency_min_ns: 0,
+            #[cfg(feature = "std")]
+            latency_max_ns: 0,
+            max_failures: 0,
+            limited_failures: AtomicU64::new(0),
+            #[cfg(feature = "std")]
+            total_latency_ns: AtomicU64::new(0),
         }
     }
 
@@ -313,17 +411,17 @@ impl FailureConfig {
         self
     }
 
-    /// Set seed from `FALLIBLE_SEED` environment variable.
+    /// Set seed from `FALLIBLES_SEED` environment variable.
     ///
     /// If the environment variable is not set or invalid, uses default (0).
     ///
     /// # Example
     /// ```bash
-    /// FALLIBLE_SEED=12345 cargo test
+    /// FALLIBLES_SEED=12345 cargo test
     /// ```
     #[cfg(feature = "std")]
     pub fn with_seed_from_env(mut self) -> Self {
-        if let Ok(seed_str) = std::env::var("FALLIBLE_SEED") {
+        if let Ok(seed_str) = std::env::var("FALLIBLES_SEED") {
             if let Ok(seed) = seed_str.parse::<u64>() {
                 self.seed = seed;
             }
@@ -347,6 +445,48 @@ impl FailureConfig {
         F: Fn() -> bool + Send + Sync + 'static,
     {
         self.predicate = Some(Box::new(predicate));
+        self
+    }
+
+    /// Add artificial latency/delay to failure points.
+    ///
+    /// Adds a delay (in the specified range) every time a failure point is checked,
+    /// even if no failure is triggered. Useful for simulating slow networks or I/O.
+    ///
+    /// # Example
+    /// ```
+    /// use std::time::Duration;
+    ///
+    /// // Add 10-50ms latency to all checks
+    /// let config = FailureConfig::new()
+    ///     .with_probability(0.2)
+    ///     .with_latency(Duration::from_millis(10), Duration::from_millis(50));
+    ///
+    /// // Fixed latency
+    /// let config = FailureConfig::new()
+    ///     .with_latency(Duration::from_millis(100), Duration::from_millis(100));
+    /// ```
+    #[cfg(feature = "std")]
+    pub fn with_latency(mut self, min: Duration, max: Duration) -> Self {
+        self.latency_min_ns = min.as_nanos() as u64;
+        self.latency_max_ns = max.as_nanos() as u64;
+        self
+    }
+
+    /// Limit the total number of failures that can be triggered.
+    ///
+    /// Once this limit is reached, no more failures will occur even if
+    /// probability or other conditions would trigger them.
+    ///
+    /// # Example
+    /// ```
+    /// // Allow at most 5 failures, then stop
+    /// let config = FailureConfig::new()
+    ///     .with_probability(0.5)
+    ///     .max_failures(5);
+    /// ```
+    pub fn max_failures(mut self, max: u64) -> Self {
+        self.max_failures = max;
         self
     }
 
@@ -398,6 +538,9 @@ impl FailureConfig {
         FailureStats {
             total_checks: self.counter.load(Ordering::Relaxed),
             total_failures: self.failures_triggered.load(Ordering::Relaxed),
+            limited_failures: self.limited_failures.load(Ordering::Relaxed),
+            #[cfg(feature = "std")]
+            total_latency_ns: self.total_latency_ns.load(Ordering::Relaxed),
         }
     }
 
@@ -639,6 +782,29 @@ pub fn should_simulate_failure(fp: FailurePoint) -> bool {
 }
 
 fn check_and_trigger(config: &FailureConfig, fp: FailurePoint) -> bool {
+    // Inject latency if configured
+    #[cfg(feature = "std")]
+    if config.latency_max_ns > 0 {
+        let latency_ns = if config.latency_min_ns == config.latency_max_ns {
+            config.latency_min_ns
+        } else {
+            // Generate random latency in range [min, max]
+            let counter = config.counter.load(Ordering::Relaxed);
+            let mut bytes = [0u8; 12];
+            bytes[0..4].copy_from_slice(&fp.id.0.to_le_bytes());
+            bytes[4..12].copy_from_slice(&counter.to_le_bytes());
+            let hash = fxhash::hash64(&bytes);
+            
+            let range = config.latency_max_ns - config.latency_min_ns;
+            config.latency_min_ns + (hash % range)
+        };
+        
+        if latency_ns > 0 {
+            std::thread::sleep(Duration::from_nanos(latency_ns));
+            config.total_latency_ns.fetch_add(latency_ns, Ordering::Relaxed);
+        }
+    }
+
     if let Some(on_check) = &config.on_check {
         on_check(fp);
     }
@@ -646,13 +812,24 @@ fn check_and_trigger(config: &FailureConfig, fp: FailurePoint) -> bool {
     let should_fail = config.should_trigger(fp.id);
 
     if should_fail {
+        // Check if we've hit the failure limit
+        if config.max_failures > 0 {
+            let current_failures = config.failures_triggered.load(Ordering::Relaxed);
+            if current_failures >= config.max_failures {
+                // Record that we would have failed but were limited
+                config.limited_failures.fetch_add(1, Ordering::Relaxed);
+                return false;
+            }
+        }
+
         config.failures_triggered.fetch_add(1, Ordering::Relaxed);
         if let Some(on_failure) = &config.on_failure {
             on_failure(fp);
         }
+        return true;
     }
 
-    should_fail
+    false
 }
 
 /// Get statistics about the current configuration.
