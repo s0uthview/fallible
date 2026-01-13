@@ -8,13 +8,14 @@ use syn::{
 fn extract_result_error_type(return_type: &ReturnType) -> Option<&Type> {
     if let ReturnType::Type(_, ty) = return_type
         && let Type::Path(type_path) = &**ty
-            && let Some(segment) = type_path.path.segments.last()
-                && segment.ident == "Result"
-                    && let PathArguments::AngleBracketed(args) = &segment.arguments
-                        && args.args.len() == 2
-                            && let Some(GenericArgument::Type(err_type)) = args.args.iter().nth(1) {
-                                return Some(err_type);
-                            }
+        && let Some(segment) = type_path.path.segments.last()
+        && segment.ident == "Result"
+        && let PathArguments::AngleBracketed(args) = &segment.arguments
+        && args.args.len() == 2
+        && let Some(GenericArgument::Type(err_type)) = args.args.iter().nth(1)
+    {
+        return Some(err_type);
+    }
     None
 }
 
@@ -209,11 +210,12 @@ pub fn derive_fallible_error(input: TokenStream) -> TokenStream {
     let custom_message = input.attrs.iter().find_map(|attr| {
         if attr.path().is_ident("fallible")
             && let Meta::NameValue(nv) = &attr.meta
-                && nv.path.is_ident("message")
-                    && let syn::Expr::Lit(expr_lit) = &nv.value
-                        && let Lit::Str(lit_str) = &expr_lit.lit {
-                            return Some(lit_str.value());
-                        }
+            && nv.path.is_ident("message")
+            && let syn::Expr::Lit(expr_lit) = &nv.value
+            && let Lit::Str(lit_str) = &expr_lit.lit
+        {
+            return Some(lit_str.value());
+        }
         None
     });
 
