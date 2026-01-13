@@ -1,6 +1,6 @@
 [package]
 name = "fallible"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2024"
 description = "Failure injection library for testing error handling in Rust"
 license = "MIT"
