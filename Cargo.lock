@@ -26,7 +26,7 @@ dependencies = [
 
 [[package]]
 name = "fallibles"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "fallibles-core",
  "fallibles-macro",
@@ -35,7 +35,7 @@ dependencies = [
 
 [[package]]
 name = "fallibles-core"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "anyhow",
  "eyre",

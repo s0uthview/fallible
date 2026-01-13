@@ -1,6 +1,6 @@
 [package]
 name = "fallibles"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 description = "Failure injection library for testing error handling in Rust"
 license = "MIT"
@@ -10,7 +10,7 @@ keywords = ["testing", "fault-injection", "chaos", "reliability", "errors"]
 categories = ["development-tools::testing", "development-tools::debugging"]
 
 [dependencies]
-fallibles-core = { version = "0.1.1", path = "../fallibles-core" }
+fallibles-core = { version = "0.1.2", path = "../fallibles-core" }
 fallibles-macro = { version = "0.1.2", path = "../fallibles-macro" }
 fxhash = "0.2.1"
 
