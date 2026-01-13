@@ -1,5 +1,5 @@
-use fallible::*;
 use anyhow;
+use fallible::*;
 use std::io;
 
 #[derive(Debug, FallibleError)]
@@ -11,7 +11,9 @@ struct ConfigError {
 #[derive(Debug, FallibleError)]
 enum NetworkError {
     #[fallible]
-    Timeout { message: String },
+    Timeout {
+        message: String,
+    },
     ConnectionRefused,
     InvalidResponse,
 }
@@ -83,10 +85,7 @@ fn main() {
     }
 
     println!("\nWith 50% probability:");
-    fallible_core::configure_failures(
-        fallible_core::FailureConfig::new()
-            .with_probability(0.5)
-    );
+    fallible_core::configure_failures(fallible_core::FailureConfig::new().with_probability(0.5));
 
     for i in 0..10 {
         match read_config() {
@@ -96,10 +95,7 @@ fn main() {
     }
 
     println!("\nWith trigger_every(3):");
-    fallible_core::configure_failures(
-        fallible_core::FailureConfig::new()
-            .trigger_every(3)
-    );
+    fallible_core::configure_failures(fallible_core::FailureConfig::new().trigger_every(3));
 
     for i in 0..10 {
         match fetch_data() {
@@ -109,10 +105,7 @@ fn main() {
     }
 
     println!("\nTesting custom error types:");
-    fallible_core::configure_failures(
-        fallible_core::FailureConfig::new()
-            .with_probability(0.5)
-    );
+    fallible_core::configure_failures(fallible_core::FailureConfig::new().with_probability(0.5));
 
     for i in 0..5 {
         match load_settings() {
@@ -132,7 +125,7 @@ fn main() {
             })
             .on_failure(|fp| {
                 println!("  [FAILURE TRIGGERED] {} (id: {:?})", fp.function, fp.id);
-            })
+            }),
     );
 
     println!("Testing with callbacks:");
@@ -148,8 +141,10 @@ fn main() {
         println!("\nStatistics:");
         println!("  Total checks: {}", stats.total_checks);
         println!("  Total failures: {}", stats.total_failures);
-        println!("  Failure rate: {:.1}%", 
-            (stats.total_failures as f64 / stats.total_checks as f64) * 100.0);
+        println!(
+            "  Failure rate: {:.1}%",
+            (stats.total_failures as f64 / stats.total_checks as f64) * 100.0
+        );
     }
 
     fallible_core::clear_failure_config();
@@ -161,8 +156,7 @@ fn main() {
         .unwrap()
         .block_on(async {
             fallible_core::configure_failures(
-                fallible_core::FailureConfig::new()
-                    .with_probability(0.5)
+                fallible_core::FailureConfig::new().with_probability(0.5),
             );
 
             for i in 0..5 {
@@ -176,14 +170,15 @@ fn main() {
         });
 
     println!("\nTesting std error types:");
-    fallible_core::configure_failures(
-        fallible_core::FailureConfig::new()
-            .with_probability(0.5)
-    );
+    fallible_core::configure_failures(fallible_core::FailureConfig::new().with_probability(0.5));
 
     for i in 0..3 {
         match read_file() {
-            Ok(data) => println!("Attempt {}: read_file succeeded with {} bytes", i, data.len()),
+            Ok(data) => println!(
+                "Attempt {}: read_file succeeded with {} bytes",
+                i,
+                data.len()
+            ),
             Err(e) => println!("Attempt {}: read_file failed: {}", i, e),
         }
     }
