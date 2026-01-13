@@ -26,6 +26,9 @@ dependencies = [
 [[package]]
 name = "fallible-core"
 version = "0.1.0"
+dependencies = [
+ "fxhash",
+]
 
 [[package]]
 name = "fallible-macro"
