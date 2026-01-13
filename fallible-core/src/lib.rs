@@ -15,13 +15,24 @@ pub struct FailurePointId(pub u32);
 #[derive(Copy, Clone, Debug)]
 pub struct FailurePoint {
     pub id: FailurePointId,
+    pub function: &'static str,
+    pub file: &'static str,
+    pub line: u32,
+    pub column: u32,
 }
 
 pub struct PanicHandler;
 
 impl FailureHandler for PanicHandler {
     fn handle(&self, fp: FailurePoint) -> ! {
-        panic!("fallible simulated failure {:?}", fp);
+        panic!(
+            "fallible simulated failure {:?} at {}:{}:{} ({})",
+            fp.id,
+            fp.file,
+            fp.line,
+            fp.column,
+            fp.function,
+        );
     }
 }
 
@@ -38,6 +49,7 @@ pub fn set_global_handler<H: FailureHandler + 'static>(handler: H) {
     GLOBAL_HANDLER_VTABLE.store(parts[1], Ordering::SeqCst);
 }
 
+#[inline(always)]
 pub fn simulated_failure(fp: FailurePoint) -> ! {
     unsafe {
         let data = GLOBAL_HANDLER_DATA.load(Ordering::SeqCst);
@@ -45,9 +57,7 @@ pub fn simulated_failure(fp: FailurePoint) -> ! {
             let vtable = GLOBAL_HANDLER_VTABLE.load(Ordering::SeqCst);
             let parts = [data, vtable];
             let ptr: *const dyn FailureHandler = core::mem::transmute(parts);
-            let handler = &*ptr;
-
-            handler.handle(fp);
+            (&*ptr).handle(fp);
         }
     }
 
