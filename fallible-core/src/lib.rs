@@ -402,11 +402,10 @@ impl FailureConfig {
     }
 
     fn should_trigger(&self, fp_id: FailurePointId) -> bool {
-        if let Some(predicate) = &self.predicate {
-            if !predicate() {
+        if let Some(predicate) = &self.predicate
+            && !predicate() {
                 return false;
             }
-        }
 
         if !self.enabled_points.is_empty() && !self.enabled_points.contains(&fp_id) {
             return false;
