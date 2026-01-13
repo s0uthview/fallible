@@ -5,3 +5,17 @@ edition = "2024"
 
 [dependencies]
 fxhash = "0.2.1"
+
+[features]
+default = []
+std = []
+anyhow = ["dep:anyhow", "std"]
+eyre = ["dep:eyre", "std"]
+
+[dependencies.anyhow]
+version = "1"
+optional = true
+
+[dependencies.eyre]
+version = "0.6"
+optional = true

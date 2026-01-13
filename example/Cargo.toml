@@ -4,8 +4,9 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-fallible = { path = "../fallible" }
+fallible = { path = "../fallible", features = ["std", "anyhow"] }
 tokio = { version = "1", features = ["rt", "macros", "rt-multi-thread"] }
+anyhow = "1"
 
 [features]
 fallible-sim = ["fallible/fallible-sim"]

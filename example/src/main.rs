@@ -1,4 +1,6 @@
 use fallible::*;
+use anyhow;
+use std::io;
 
 #[derive(Debug, FallibleError)]
 #[fallible(message = "configuration error")]
@@ -32,6 +34,26 @@ fn load_settings() -> Result<String, ConfigError> {
 #[fallible]
 async fn network_request() -> Result<String, NetworkError> {
     Ok("response data".to_string())
+}
+
+#[fallible]
+fn read_file() -> Result<Vec<u8>, io::Error> {
+    Ok(vec![1, 2, 3, 4, 5])
+}
+
+#[fallible]
+fn parse_data() -> Result<i32, anyhow::Error> {
+    Ok(42)
+}
+
+#[fallible]
+fn optional_value() -> Option<String> {
+    Some("found".to_string())
+}
+
+#[fallible]
+fn boolean_check() -> Result<bool, ()> {
+    Ok(true)
 }
 
 fn main() {
@@ -137,4 +159,41 @@ fn main() {
 
             fallible_core::clear_failure_config();
         });
+
+    println!("\nTesting std error types:");
+    fallible_core::configure_failures(
+        fallible_core::FailureConfig::new()
+            .with_probability(0.5)
+    );
+
+    for i in 0..3 {
+        match read_file() {
+            Ok(data) => println!("Attempt {}: read_file succeeded with {} bytes", i, data.len()),
+            Err(e) => println!("Attempt {}: read_file failed: {}", i, e),
+        }
+    }
+
+    for i in 0..3 {
+        match parse_data() {
+            Ok(n) => println!("Attempt {}: parse_data succeeded: {}", i, n),
+            Err(e) => println!("Attempt {}: parse_data failed: {}", i, e),
+        }
+    }
+
+    for i in 0..3 {
+        match optional_value() {
+            Some(s) => println!("Attempt {}: optional_value: Some({})", i, s),
+            None => println!("Attempt {}: optional_value: None", i),
+        }
+    }
+
+    for i in 0..3 {
+        match boolean_check() {
+            Ok(true) => println!("Attempt {}: boolean_check: true", i),
+            Ok(false) => println!("Attempt {}: boolean_check: false", i),
+            Err(_) => println!("Attempt {}: boolean_check: error", i),
+        }
+    }
+
+    fallible_core::clear_failure_config();
 }

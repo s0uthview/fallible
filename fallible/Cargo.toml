@@ -10,3 +10,6 @@ fallible-macro = { path = "../fallible-macro" }
 [features]
 default = ["fallible-sim"]
 fallible-sim = []
+std = ["fallible-core/std"]
+anyhow = ["fallible-core/anyhow"]
+eyre = ["fallible-core/eyre"]

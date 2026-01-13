@@ -2,6 +2,9 @@
 
 extern crate alloc;
 
+#[cfg(feature = "std")]
+extern crate std;
+
 use core::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use alloc::boxed::Box;
 use alloc::vec::Vec;
@@ -25,6 +28,45 @@ impl FallibleError for alloc::string::String {
 impl<T: FallibleError> FallibleError for alloc::boxed::Box<T> {
     fn simulated_failure() -> Self {
         alloc::boxed::Box::new(T::simulated_failure())
+    }
+}
+
+#[cfg(feature = "std")]
+impl FallibleError for std::io::Error {
+    fn simulated_failure() -> Self {
+        std::io::Error::new(std::io::ErrorKind::Other, "simulated failure")
+    }
+}
+
+#[cfg(feature = "anyhow")]
+impl FallibleError for anyhow::Error {
+    fn simulated_failure() -> Self {
+        anyhow::anyhow!("simulated failure")
+    }
+}
+
+#[cfg(feature = "eyre")]
+impl FallibleError for eyre::Report {
+    fn simulated_failure() -> Self {
+        eyre::eyre!("simulated failure")
+    }
+}
+
+impl FallibleError for () {
+    fn simulated_failure() -> Self {
+        ()
+    }
+}
+
+impl FallibleError for bool {
+    fn simulated_failure() -> Self {
+        false
+    }
+}
+
+impl<T> FallibleError for Option<T> {
+    fn simulated_failure() -> Self {
+        None
     }
 }
 
