@@ -215,12 +215,16 @@ fn test_basic() {
 
     println!("\nTesting macro attributes:");
     println!("low_probability_fail (20% chance):");
-    for i in 0..10 {
+    for i in 0..50 {
         match low_probability_fail() {
-            Ok(n) => println!("  Attempt {}: succeeded with {}", i, n),
-            Err(_) => println!("  Attempt {}: failed", i),
+            Ok(n) => print!("."),
+            Err(_) => print!("X"),
+        }
+        if (i + 1) % 10 == 0 {
+            println!(" ({})", i + 1);
         }
     }
+    println!();
 
     println!("\nperiodic_fail (every 2nd call):");
     for i in 0..6 {

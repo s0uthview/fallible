@@ -216,10 +216,32 @@ impl FailureConfig {
             let mut bytes = [0u8; 12];
             bytes[0..4].copy_from_slice(&fp_id.0.to_le_bytes());
             bytes[4..12].copy_from_slice(&counter.to_le_bytes());
+
             let hash1 = fxhash::hash32(&bytes);
             let hash2 = fxhash::hash64(&bytes);
-            let combined_hash = (hash1 as u64).wrapping_mul(hash2);
-            let final_hash = (combined_hash >> 32) as u32;
+
+            let mut combined = (hash1 as u64) ^ hash2;
+
+            #[cfg(feature = "std")]
+            {
+                use std::time::{SystemTime, UNIX_EPOCH};
+                let nanos = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .map(|d| d.as_nanos() as u64)
+                    .unwrap_or(0);
+                let thread_id = std::thread::current().id();
+                let thread_hash = fxhash::hash64(&std::format!("{:?}", thread_id).as_bytes());
+                let stack_addr = &nanos as *const _ as usize as u64;
+                combined ^= nanos.wrapping_add(stack_addr).wrapping_mul(thread_hash);
+            }
+
+            combined ^= combined >> 33;
+            combined = combined.wrapping_mul(0xff51afd7ed558ccd);
+            combined ^= combined >> 33;
+            combined = combined.wrapping_mul(0xc4ceb9fe1a85ec53);
+            combined ^= combined >> 33;
+
+            let final_hash = (combined >> 32) as u32;
             return final_hash < self.probability;
         }
 
