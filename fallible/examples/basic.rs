@@ -126,7 +126,7 @@ fn main() {
     {
         let _guard = fallible_core::with_config(
             fallible_core::FailureConfig::new()
-                .with_probability(0.3)
+                .with_probability(0.5)
                 .on_failure(|fp| {
                     eprintln!(
                         "   [FAILURE] {}:{} in {}",
@@ -135,10 +135,14 @@ fn main() {
                 }),
         );
 
-        for _ in 0..5 {
-            let _ = read_config();
+        for i in 0..15 {
+            print!("   Attempt {}: ", i);
+            match read_config() {
+                Ok(_) => println!("success"),
+                Err(_) => println!("failed (callback triggered above)"),
+            }
         }
     }
 
-    println!("\nfinished");
+    println!("\ncomplete!");
 }
