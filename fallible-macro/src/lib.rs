@@ -192,8 +192,8 @@ pub fn fallible(attr: TokenStream, item: TokenStream) -> TokenStream {
                 combined = combined.wrapping_mul(0xc4ceb9fe1a85ec53);
                 combined ^= combined >> 33;
 
-                let final_hash = (combined >> 32) as u32;
-                if final_hash < #prob_u32 {
+                let threshold = ((#prob_u32 as u64) << 32) | #prob_u32 as u64;
+                if combined < threshold {
                     return Err(<#error_type as ::fallible::fallible_core::FallibleError>::simulated_failure());
                 }
             }

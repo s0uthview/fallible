@@ -9,7 +9,7 @@ fallible-macro = { path = "../fallible-macro" }
 fxhash = "0.2.1"
 
 [features]
-default = ["fallible-sim"]
+default = ["fallible-sim", "std"]
 fallible-sim = []
 std = ["fallible-core/std"]
 anyhow = ["fallible-core/anyhow"]

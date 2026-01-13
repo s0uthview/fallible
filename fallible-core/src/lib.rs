@@ -451,8 +451,8 @@ impl FailureConfig {
             combined = combined.wrapping_mul(0xc4ceb9fe1a85ec53);
             combined ^= combined >> 33;
 
-            let final_hash = (combined >> 32) as u32;
-            return final_hash < self.probability;
+            let threshold = ((self.probability as u64) << 32) | self.probability as u64;
+            return combined < threshold;
         }
 
         false
