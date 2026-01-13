@@ -11,7 +11,7 @@ categories = ["development-tools::testing", "development-tools::debugging"]
 
 [dependencies]
 fallibles-core = { version = "0.1.1", path = "../fallibles-core" }
-fallibles-macro = { version = "0.1.1", path = "../fallibles-macro" }
+fallibles-macro = { version = "0.1.2", path = "../fallibles-macro" }
 fxhash = "0.2.1"
 
 [features]

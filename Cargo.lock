@@ -44,7 +44,7 @@ dependencies = [
 
 [[package]]
 name = "fallibles-macro"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "fallibles-core",
  "fxhash",
