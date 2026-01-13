@@ -1,3 +1,10 @@
+//! # fallible-macro
+//!
+//! This crate provides the `#[fallible]` attribute macro and `#[derive(FallibleError)]`
+//! for fault injection in Rust functions.
+//!
+//! See the main `fallible` crate for usage examples.
+
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{
@@ -72,6 +79,53 @@ impl Parse for FallibleAttrs {
     }
 }
 
+/// Mark a function for failure injection.
+///
+/// When failure injection is enabled via configuration, this function may return an error
+/// instead of executing normally. The function must return a `Result<T, E>` where `E`
+/// implements the `FallibleError` trait.
+///
+/// # Attributes
+///
+/// - `probability = 0.0..1.0` - Set inline failure probability (0.0 to 1.0)
+/// - `trigger_every = N` - Fail every Nth call deterministically
+/// - `enabled = true/false` - Enable/disable this specific failure point
+///
+/// # Examples
+///
+/// Basic usage:
+/// ```rust
+/// use fallible::fallible;
+///
+/// #[fallible]
+/// fn risky_operation() -> Result<String, &'static str> {
+///     Ok("success".to_string())
+/// }
+/// ```
+///
+/// With inline probability:
+/// ```rust
+/// #[fallible(probability = 0.2)]  // 20% failure rate
+/// fn unstable_api() -> Result<i32, &'static str> {
+///     Ok(42)
+/// }
+/// ```
+///
+/// Deterministic failures:
+/// ```rust
+/// #[fallible(trigger_every = 5)]  // Fail every 5th call
+/// fn periodic_task() -> Result<(), String> {
+///     Ok(())
+/// }
+/// ```
+///
+/// Works with async functions:
+/// ```rust
+/// #[fallible]
+/// async fn fetch_data() -> Result<Vec<u8>, std::io::Error> {
+///     Ok(vec![1, 2, 3])
+/// }
+/// ```
 #[proc_macro_attribute]
 pub fn fallible(attr: TokenStream, item: TokenStream) -> TokenStream {
     let attrs = parse_macro_input!(attr as FallibleAttrs);
@@ -200,6 +254,43 @@ pub fn fallible(attr: TokenStream, item: TokenStream) -> TokenStream {
     expanded.into()
 }
 
+/// Derive the `FallibleError` trait for custom error types.
+///
+/// Implements `FallibleError::simulated_failure()` for your error type.
+///
+/// # Attributes
+///
+/// - `#[fallible(message = "...")]` - Custom error message (struct/enum level)
+/// - `#[fallible]` - Mark a specific enum variant to use for failures
+///
+/// # Examples
+///
+/// Simple struct:
+/// ```rust
+/// use fallible::FallibleError;
+///
+/// #[derive(Debug, FallibleError)]
+/// #[fallible(message = "config error")]
+/// struct ConfigError {
+///     message: String,
+/// }
+/// ```
+///
+/// Enum with marked variant:
+/// ```rust
+/// #[derive(Debug, FallibleError)]
+/// enum NetworkError {
+///     #[fallible]  // This variant will be used for simulated failures
+///     Timeout { message: String },
+///     ConnectionRefused,
+/// }
+/// ```
+///
+/// Unit struct:
+/// ```rust
+/// #[derive(Debug, FallibleError)]
+/// struct SimpleError;
+/// ```
 #[proc_macro_derive(FallibleError, attributes(fallible))]
 pub fn derive_fallible_error(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
