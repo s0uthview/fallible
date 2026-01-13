@@ -76,6 +76,7 @@ fn main() {
     test_basic();
     test_policies();
     test_thread_config();
+    test_seeded_randomness();
 }
 
 fn test_basic() {
@@ -325,5 +326,103 @@ fn test_thread_config() {
             Ok(x) => println!("  Main attempt {}: succeeded with {}", i, x),
             Err(_) => println!("  Main attempt {}: failed", i),
         }
+    }
+}
+
+fn test_seeded_randomness() {
+    println!("\n=== Testing Seeded Randomness ===\n");
+    
+    println!("Seed 12345 (run 1):");
+    {
+        let _guard = fallible_core::with_config(
+            fallible_core::FailureConfig::new()
+                .with_probability(0.3)
+                .with_seed(12345),
+        );
+        for i in 0..20 {
+            match read_config() {
+                Ok(_) => print!("."),
+                Err(_) => print!("X"),
+            }
+            if (i + 1) % 10 == 0 {
+                print!(" ");
+            }
+        }
+        println!();
+    }
+    
+    println!("\nSeed 12345 (run 2 - should match run 1):");
+    {
+        let _guard = fallible_core::with_config(
+            fallible_core::FailureConfig::new()
+                .with_probability(0.3)
+                .with_seed(12345),
+        );
+        for i in 0..20 {
+            match read_config() {
+                Ok(_) => print!("."),
+                Err(_) => print!("X"),
+            }
+            if (i + 1) % 10 == 0 {
+                print!(" ");
+            }
+        }
+        println!();
+    }
+    
+    println!("\nSeed 67890 (different seed - different pattern):");
+    {
+        let _guard = fallible_core::with_config(
+            fallible_core::FailureConfig::new()
+                .with_probability(0.3)
+                .with_seed(67890),
+        );
+        for i in 0..20 {
+            match read_config() {
+                Ok(_) => print!("."),
+                Err(_) => print!("X"),
+            }
+            if (i + 1) % 10 == 0 {
+                print!(" ");
+            }
+        }
+        println!();
+    }
+    
+    println!("\nNo seed (uses system entropy - varies each run):");
+    {
+        let _guard = fallible_core::with_config(
+            fallible_core::FailureConfig::new()
+                .with_probability(0.3),
+        );
+        for i in 0..20 {
+            match read_config() {
+                Ok(_) => print!("."),
+                Err(_) => print!("X"),
+            }
+            if (i + 1) % 10 == 0 {
+                print!(" ");
+            }
+        }
+        println!();
+    }
+    
+    println!("\nEnvironment variable seed (FALLIBLE_SEED):");
+    {
+        let _guard = fallible_core::with_config(
+            fallible_core::FailureConfig::new()
+                .with_probability(0.3)
+                .with_seed_from_env(),
+        );
+        for i in 0..20 {
+            match read_config() {
+                Ok(_) => print!("."),
+                Err(_) => print!("X"),
+            }
+            if (i + 1) % 10 == 0 {
+                print!(" ");
+            }
+        }
+        println!();
     }
 }

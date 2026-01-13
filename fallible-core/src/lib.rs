@@ -122,6 +122,7 @@ pub struct FailureConfig {
     on_check: Option<FailureCallback>,
     on_failure: Option<FailureCallback>,
     failures_triggered: AtomicU64,
+    seed: u64,
 }
 
 impl FailureConfig {
@@ -134,6 +135,7 @@ impl FailureConfig {
             on_check: None,
             on_failure: None,
             failures_triggered: AtomicU64::new(0),
+            seed: 0,
         }
     }
 
@@ -158,6 +160,7 @@ impl FailureConfig {
             on_check: None,
             on_failure: None,
             failures_triggered: AtomicU64::new(0),
+            seed: 0,
         }
     }
 
@@ -173,6 +176,21 @@ impl FailureConfig {
 
     pub fn trigger_every(mut self, n: u64) -> Self {
         self.trigger_every = n;
+        self
+    }
+
+    pub fn with_seed(mut self, seed: u64) -> Self {
+        self.seed = seed;
+        self
+    }
+
+    #[cfg(feature = "std")]
+    pub fn with_seed_from_env(mut self) -> Self {
+        if let Ok(seed_str) = std::env::var("FALLIBLE_SEED") {
+            if let Ok(seed) = seed_str.parse::<u64>() {
+                self.seed = seed;
+            }
+        }
         self
     }
 
@@ -220,17 +238,24 @@ impl FailureConfig {
 
             let mut combined = (hash1 as u64) ^ hash2;
 
-            #[cfg(feature = "std")]
-            {
-                use std::time::{SystemTime, UNIX_EPOCH};
-                let nanos = SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .map(|d| d.as_nanos() as u64)
-                    .unwrap_or(0);
-                let thread_id = std::thread::current().id();
-                let thread_hash = fxhash::hash64(&std::format!("{:?}", thread_id).as_bytes());
-                let stack_addr = &nanos as *const _ as usize as u64;
-                combined ^= nanos.wrapping_add(stack_addr).wrapping_mul(thread_hash);
+            // Mix in entropy source: seed (deterministic) or system (non-deterministic)
+            if self.seed != 0 {
+                // Deterministic: use seed for reproducible variation
+                combined ^= self.seed.wrapping_mul(0x517cc1b727220a95);
+            } else {
+                // Non-deterministic: use system entropy for true randomness
+                #[cfg(feature = "std")]
+                {
+                    use std::time::{SystemTime, UNIX_EPOCH};
+                    let nanos = SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .map(|d| d.as_nanos() as u64)
+                        .unwrap_or(0);
+                    let thread_id = std::thread::current().id();
+                    let thread_hash = fxhash::hash64(&std::format!("{:?}", thread_id).as_bytes());
+                    let stack_addr = &nanos as *const _ as usize as u64;
+                    combined ^= nanos.wrapping_add(stack_addr).wrapping_mul(thread_hash);
+                }
             }
 
             combined ^= combined >> 33;
